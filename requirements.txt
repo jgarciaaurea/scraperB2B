@@ -1,7 +1,10 @@
-requests
+httpx
 python-dotenv
-Flask
+fastapi
+uvicorn[standard]
 beautifulsoup4
 lxml
-mysql-connector-python
+aiosqlite
 playwright
+jinja2
+python-multipart

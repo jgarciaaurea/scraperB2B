@@ -2,7 +2,8 @@ import os
 import re
 import time
 import sqlite3
-import requests
+import httpx as requests
+from urllib.parse import quote as _quote
 from bs4 import BeautifulSoup
 
 basedir = os.path.abspath(os.path.dirname(__file__))
@@ -47,7 +48,7 @@ def consultar_libreborme(nif, nombre_empresa):
             nombre = limpiar_nombre_para_busqueda(nombre_empresa)
             if len(nombre) < 3:
                 return None
-            url = f"https://libreborme.net/borme/api/v1/empresa/search/?q={requests.utils.quote(nombre)}"
+            url = f"https://libreborme.net/borme/api/v1/empresa/search/?q={_quote(nombre)}"
             res = requests.get(url, headers=HEADERS, timeout=6)
             if res.status_code == 200:
                 resultados = res.json().get('objects', [])
@@ -76,7 +77,7 @@ def consultar_infoempresa(nif, nombre_empresa):
     if nombre_empresa:
         nombre = limpiar_nombre_para_busqueda(nombre_empresa)
         if len(nombre) >= 3:
-            intentos.append(f"https://www.infoempresa.com/es-es/es/buscar-empresas?q={requests.utils.quote(nombre)}")
+            intentos.append(f"https://www.infoempresa.com/es-es/es/buscar-empresas?q={_quote(nombre)}")
 
     for url in intentos:
         try:
@@ -146,7 +147,7 @@ def consultar_einforma(nombre_empresa):
         return None
 
     try:
-        url = f"https://www.einforma.com/servlet/app/portal/LISTA_EMPRESAS/razonsocial/{requests.utils.quote(nombre)}"
+        url = f"https://www.einforma.com/servlet/app/portal/LISTA_EMPRESAS/razonsocial/{_quote(nombre)}"
         res = requests.get(url, headers=HEADERS, timeout=8)
         if res.status_code != 200:
             return None

@@ -2,6 +2,7 @@ import os
 import time
 import sqlite3
 import requests
+import httpx
 from urllib.parse import urlparse
 from dotenv import load_dotenv
 
@@ -101,7 +102,7 @@ def buscar_empresas_solo_google(sector, ubicacion):
     
     leads_basicos = []
     try:
-        response = requests.post(url, json=payload, headers=headers)
+        response = httpx.post(url, json=payload, headers=headers, timeout=15)
         if response.status_code == 200:
             places = response.json().get("places", [])
             for place in places:

@@ -3,7 +3,7 @@ import re
 import time
 import json
 import sqlite3
-import requests
+import httpx as requests
 
 basedir = os.path.abspath(os.path.dirname(__file__))
 DB_FILE = os.path.join(basedir, "leads.db")

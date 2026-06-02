@@ -1,8 +1,10 @@
 import os
 import re
 import sqlite3
+import httpx
 import requests
 import urllib3
+from urllib.parse import quote as _quote
 from urllib.parse import urlparse
 from bs4 import BeautifulSoup
 
@@ -82,11 +84,11 @@ def buscar_nif_infoempresa(nombre_empresa, dominio=None):
     # Intento 1: buscar por dominio web (muy preciso)
     if dominio:
         dominio_limpio = dominio.replace('www.', '').strip('/')
-        intentos.append(f"https://www.infoempresa.com/es-es/es/buscar-empresas?q={requests.utils.quote(dominio_limpio)}")
+        intentos.append(f"https://www.infoempresa.com/es-es/es/buscar-empresas?q={_quote(dominio_limpio)}")
 
     # Intento 2: buscar por nombre
     if nombre_empresa:
-        intentos.append(f"https://www.infoempresa.com/es-es/es/buscar-empresas?q={requests.utils.quote(nombre_empresa)}")
+        intentos.append(f"https://www.infoempresa.com/es-es/es/buscar-empresas?q={_quote(nombre_empresa)}")
 
     for url_busqueda in intentos:
         try:
@@ -143,7 +145,7 @@ def buscar_nif_duckduckgo(nombre_empresa, dominio=None):
 
     for query in queries:
         try:
-            url = f'https://html.duckduckgo.com/html/?q={requests.utils.quote(query)}'
+            url = f'https://html.duckduckgo.com/html/?q={_quote(query)}'
             res = requests.get(url, headers=headers, timeout=8)
             if res.status_code != 200:
                 continue
@@ -255,15 +257,15 @@ def extraer_datos_de_url(url, _nombre_empresa=None):
 
     html_principal = None
 
-    # Intento 1: requests normal
+    # Intento 1: httpx
     try:
-        res = requests.get(url, headers=headers, timeout=10, verify=False)
+        res = httpx.get(url, headers=headers, timeout=15, follow_redirects=True, verify=False)
         if res.status_code == 200:
             html_principal = res.text
-    except requests.exceptions.Timeout:
+    except httpx.TimeoutException:
         print(f"⏱️ [F2] Timeout en {url}, reintentando con más tiempo...")
         try:
-            res = requests.get(url, headers=headers, timeout=20, verify=False)
+            res = httpx.get(url, headers=headers, timeout=25, follow_redirects=True, verify=False)
             if res.status_code == 200:
                 html_principal = res.text
         except Exception:
