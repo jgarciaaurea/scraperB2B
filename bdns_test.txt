@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="es">
+
+<head>
+  <meta charset="utf-8">
+  <title>Sistema Nacional de Publicidad de Subvenciones y Ayudas Públicas</title>
+  <base href="/bdnstrans/">
+
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="SNPSAP es el portal de transparencia y publicidad de convocatorias, ayudas de minimis, ayudas de Estado y otros tipos de concesiones.
+  Permite la suscripción de avisos de subvenciones personalizados. Ofrece una API para la consulta de los datos.">
+  <meta name="author" content="IGAE - OIP - División I - Área 3.2">
+
+  <!-- Favicon de la aplicación -->
+  <link rel="icon" type="image/x-icon" href="favicon.ico">
+<link rel="stylesheet" href="styles.9baea989a7d19be8.css"></head>
+
+<!-- Cuerpo -->
+
+<body class="background">
+  <app-root></app-root>
+<script src="runtime.13de4915e7105d56.js" type="module"></script><script src="polyfills.b6bcf3bf6b25ed6b.js" type="module"></script><script src="main.b4c1bf82b2f30ae7.js" type="module"></script></body>
+
+</html>

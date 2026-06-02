@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__Claude_Preview__preview_start",
+      "Bash(python -c \"import ast; ast.parse\\(open\\('templates/index.html'\\).read\\(\\)\\)\")",
+      "PowerShell(Get-NetTCPConnection -LocalPort 5000 -State Listen -ErrorAction SilentlyContinue | ForEach-Object { $p = Get-Process -Id $_.OwningProcess; \"$\\($_.OwningProcess\\) - $\\($p.Name\\) - $\\($p.MainModule.FileName\\)\" })",
+      "PowerShell(Get-Process -Id 15472 | Select-Object Id, Name, CommandLine; \\(Get-CimInstance Win32_Process -Filter \"ProcessId=15472\"\\).CommandLine)",
+      "PowerShell(Stop-Process -Id 15472 -Force)",
+      "PowerShell(Get-NetTCPConnection -LocalPort 5000 -State Listen -ErrorAction SilentlyContinue)",
+      "WebFetch(domain:automovilesgomez.com)",
+      "WebFetch(domain:www.pap.hacienda.gob.es)",
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:datos.gob.es)"
+    ]
+  }
+}

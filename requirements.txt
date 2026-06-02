@@ -1,0 +1,7 @@
+requests
+python-dotenv
+Flask
+beautifulsoup4
+lxml
+mysql-connector-python
+playwright

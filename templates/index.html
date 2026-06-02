@@ -1,0 +1,976 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Leads B2B</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes pulse-dot {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(0.85); }
+        }
+        .spinner {
+            display: inline-block;
+            width: 11px; height: 11px;
+            border: 2px solid rgba(234,88,12,0.25);
+            border-top-color: #ea580c;
+            border-radius: 50%;
+            animation: spin 0.75s linear infinite;
+            flex-shrink: 0;
+        }
+        .dot-pulse {
+            display: inline-block;
+            width: 10px; height: 10px;
+            border-radius: 50%;
+            animation: pulse-dot 1.6s ease-in-out infinite;
+        }
+        .row-enter { animation: fadeIn 0.4s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; } }
+        #leads-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 1rem;
+        }
+        @media (max-width: 1024px) {
+            #leads-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        }
+        @media (max-width: 640px) {
+            #leads-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-slate-800 font-sans min-h-screen">
+
+<div class="max-w-7xl mx-auto px-5 py-8">
+
+    <!-- Header -->
+    <header class="mb-8 flex justify-between items-center">
+        <div>
+            <h1 class="text-2xl font-bold text-slate-900 tracking-tight">Scraper Aurea Innovación</h1>
+            <p class="text-sm text-slate-400 mt-0.5">Prospección · Enriquecimiento · Registro Mercantil</p>
+        </div>
+        <div class="flex items-center gap-3">
+            {% if leads|length > 0 %}
+            <a href="/exportar"
+               class="text-xs bg-white hover:bg-emerald-50 text-slate-500 hover:text-emerald-600 border border-slate-200 hover:border-emerald-200 font-medium py-1.5 px-3 rounded-lg transition-all flex items-center gap-1.5">
+                <i class="fa-solid fa-file-csv"></i> Exportar CSV
+            </a>
+            <button onclick="abrirModalEmail()"
+               class="text-xs bg-white hover:bg-indigo-50 text-slate-500 hover:text-indigo-600 border border-slate-200 hover:border-indigo-200 font-medium py-1.5 px-3 rounded-lg transition-all flex items-center gap-1.5">
+                <i class="fa-solid fa-paper-plane"></i> Enviar por email
+            </button>
+            <!-- Contador de estados -->
+            <div id="estado-bar" class="hidden items-center gap-2 text-xs font-medium mr-2">
+                <span id="badge-procesando" class="hidden items-center gap-1.5 bg-orange-50 text-orange-600 border border-orange-200 px-2.5 py-1 rounded-full">
+                    <span class="spinner"></span>
+                    <span id="txt-procesando"></span>
+                </span>
+                <span id="badge-ok" class="hidden items-center gap-1.5 bg-green-50 text-green-700 border border-green-200 px-2.5 py-1 rounded-full">
+                    <i class="fa-solid fa-circle-check text-xs"></i>
+                    <span id="txt-ok"></span>
+                </span>
+            </div>
+            <a href="/eliminar_todo"
+               onclick="return confirm('¿Borrar todos los leads? No se puede deshacer.');"
+               class="text-xs bg-white hover:bg-red-50 text-slate-400 hover:text-red-500 border border-slate-200 hover:border-red-200 font-medium py-1.5 px-3 rounded-lg transition-all flex items-center gap-1.5">
+                <i class="fa-solid fa-trash-can"></i> Vaciar
+            </a>
+            {% endif %}
+        </div>
+    </header>
+
+    <!-- Formulario búsqueda -->
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 mb-8">
+        <div class="flex items-center gap-2 mb-5">
+            <div class="w-7 h-7 rounded-lg bg-indigo-600 flex items-center justify-center flex-shrink-0">
+                <i class="fa-solid fa-magnifying-glass text-white text-xs"></i>
+            </div>
+            <h2 class="font-semibold text-slate-700">Nueva búsqueda</h2>
+        </div>
+        <form method="POST" action="/buscar" class="flex flex-col sm:flex-row gap-3">
+            <div class="flex-1">
+                <label class="block text-xs font-medium text-slate-500 mb-1.5">Sector o actividad</label>
+                <input type="text" name="sector" placeholder="Ej: Clínicas dentales, Talleres" required
+                    class="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition bg-slate-50 focus:bg-white">
+            </div>
+            <div class="flex-1">
+                <label class="block text-xs font-medium text-slate-500 mb-1.5">Ciudad o provincia</label>
+                <input type="text" name="ubicacion" placeholder="Ej: Sevilla, Madrid" required
+                    class="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition bg-slate-50 focus:bg-white">
+            </div>
+            <div class="flex items-end">
+                <button type="submit"
+                    class="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white text-sm font-semibold py-2.5 px-6 rounded-lg transition-all cursor-pointer shadow-sm whitespace-nowrap">
+                    Buscar empresas
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Historial de búsquedas -->
+    {% if historial %}
+    <div class="mb-6">
+        <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-2">Búsquedas anteriores</p>
+        <div class="flex flex-wrap gap-2">
+            {% for sector, ubicacion, total_leads, fecha, veces in historial %}
+            <a href="/buscar-rapido?sector={{ sector | urlencode }}&ubicacion={{ ubicacion | urlencode }}"
+               onclick="return confirm('¿Repetir búsqueda: {{ sector }} en {{ ubicacion }}?')"
+               class="group flex items-center gap-2 bg-white border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50 rounded-lg px-3 py-1.5 transition-all"
+               title="Buscado {{ veces }} vez{{ 'es' if veces > 1 else '' }}">
+                <span class="text-xs font-medium text-slate-600 group-hover:text-indigo-700">{{ sector }}</span>
+                <span class="text-[10px] text-slate-400">·</span>
+                <span class="text-xs text-slate-400">{{ ubicacion }}</span>
+                {% if total_leads %}
+                <span class="text-[10px] font-semibold bg-slate-100 group-hover:bg-indigo-100 text-slate-500 group-hover:text-indigo-600 px-1.5 py-0.5 rounded-full">{{ total_leads }}</span>
+                {% endif %}
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    {% if mensaje %}
+    <div class="mb-6 p-3.5 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl text-sm flex items-center gap-2">
+        <i class="fa-solid fa-circle-check flex-shrink-0"></i>
+        {{ mensaje }}
+    </div>
+    {% endif %}
+
+    <!-- Panel de estadísticas -->
+    {% if stats %}
+    <div class="grid gap-3 mb-6" style="grid-template-columns: repeat(auto-fit, minmax(140px, 1fr))">
+
+        <!-- Total leads -->
+        <div class="bg-white rounded-xl border border-slate-200 px-4 py-3 flex flex-col gap-0.5">
+            <span class="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Total leads</span>
+            <span class="text-2xl font-bold text-slate-800">{{ stats.total }}</span>
+            {% if stats.completados < stats.total %}
+            <span class="text-[10px] text-orange-400 font-medium">{{ stats.total - stats.completados }} procesando</span>
+            {% else %}
+            <span class="text-[10px] text-green-500 font-medium">Todos completados</span>
+            {% endif %}
+        </div>
+
+        <!-- Email -->
+        <div class="bg-white rounded-xl border border-slate-200 px-4 py-3 flex flex-col gap-0.5">
+            <span class="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Con email</span>
+            <div class="flex items-baseline gap-1.5">
+                <span class="text-2xl font-bold text-slate-800">{{ stats.pct_email }}%</span>
+                <span class="text-xs text-slate-400">{{ stats.con_email }}/{{ stats.total }}</span>
+            </div>
+            <div class="h-1 bg-slate-100 rounded-full mt-1">
+                <div class="h-1 bg-indigo-400 rounded-full" style="width:{{ stats.pct_email }}%"></div>
+            </div>
+        </div>
+
+        <!-- NIF -->
+        <div class="bg-white rounded-xl border border-slate-200 px-4 py-3 flex flex-col gap-0.5">
+            <span class="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Con NIF</span>
+            <div class="flex items-baseline gap-1.5">
+                <span class="text-2xl font-bold text-slate-800">{{ stats.pct_nif }}%</span>
+                <span class="text-xs text-slate-400">{{ stats.con_nif }}/{{ stats.total }}</span>
+            </div>
+            <div class="h-1 bg-slate-100 rounded-full mt-1">
+                <div class="h-1 bg-indigo-400 rounded-full" style="width:{{ stats.pct_nif }}%"></div>
+            </div>
+            {% if sin_nif > 0 %}
+            <a href="/reintentar-nif"
+               onclick="return confirm('Buscar NIF para {{ sin_nif }} leads sin NIF. Puede tardar unos minutos.')"
+               class="mt-1.5 text-[10px] font-semibold text-orange-500 hover:text-orange-700 flex items-center gap-1 transition-colors">
+                <i class="fa-solid fa-rotate-right text-[9px]"></i> Reintentar {{ sin_nif }} sin NIF
+            </a>
+            {% endif %}
+        </div>
+
+        <!-- Puntuación media -->
+        {% if stats.puntuacion_media is not none %}
+        <div class="bg-white rounded-xl border border-slate-200 px-4 py-3 flex flex-col gap-0.5">
+            <span class="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Puntuación media</span>
+            <div class="flex items-baseline gap-1.5">
+                <span class="text-2xl font-bold
+                    {% if stats.puntuacion_media >= 7 %}text-green-600
+                    {% elif stats.puntuacion_media >= 4 %}text-amber-600
+                    {% else %}text-red-500{% endif %}">
+                    {{ stats.puntuacion_media }}
+                </span>
+                <span class="text-xs text-slate-400">/ 10</span>
+            </div>
+            <span class="text-[10px] text-green-600 font-medium">{{ stats.alta_relevancia }} de alta relevancia</span>
+        </div>
+        {% endif %}
+
+        <!-- Subvenciones -->
+        {% if stats.subvenciones_count > 0 %}
+        <div class="bg-amber-50 rounded-xl border border-amber-200 px-4 py-3 flex flex-col gap-0.5">
+            <span class="text-[10px] font-semibold uppercase tracking-wider text-amber-500">Subvenciones</span>
+            <span class="text-2xl font-bold text-amber-700">{{ stats.subvenciones_count }}</span>
+            {% if stats.subvenciones_importe > 0 %}
+            <span class="text-[10px] text-amber-600 font-medium">{{ "{:,.0f}".format(stats.subvenciones_importe).replace(",", ".") }} € total</span>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        <!-- Clientes / Interesados -->
+        {% if stats.clientes > 0 or stats.interesados > 0 %}
+        <div class="bg-white rounded-xl border border-slate-200 px-4 py-3 flex flex-col gap-0.5">
+            <span class="text-[10px] font-semibold uppercase tracking-wider text-slate-400">CRM</span>
+            {% if stats.clientes > 0 %}
+            <span class="text-2xl font-bold text-purple-600">{{ stats.clientes }} <span class="text-sm font-semibold">cliente{{ 's' if stats.clientes > 1 else '' }}</span></span>
+            {% endif %}
+            {% if stats.interesados > 0 %}
+            <span class="text-[10px] text-green-600 font-medium">{{ stats.interesados }} interesado{{ 's' if stats.interesados > 1 else '' }}</span>
+            {% endif %}
+        </div>
+        {% endif %}
+
+    </div>
+    {% endif %}
+
+    <!-- Cabecera lista -->
+    {% if leads|length > 0 %}
+    {% set leads_calificados = leads | selectattr(19) | list %}
+    {% set leads_alta = leads | selectattr(19) | selectattr(19, 'ge', 8) | list %}
+    {% set leads_media = leads | selectattr(19) | selectattr(19, 'ge', 5) | selectattr(19, 'lt', 8) | list %}
+    <div class="flex justify-between items-center mb-4">
+        <div class="flex items-center gap-3">
+            <h3 class="font-semibold text-slate-700">Base de datos</h3>
+            {% if leads_calificados %}
+            <div class="flex items-center gap-2 text-xs">
+                {% if leads_alta %}
+                <span class="flex items-center gap-1 bg-green-50 text-green-700 border border-green-200 px-2 py-0.5 rounded-full font-semibold">
+                    <i class="fa-solid fa-star text-[9px]"></i> {{ leads_alta|length }} alta relevancia
+                </span>
+                {% endif %}
+                {% if leads_media %}
+                <span class="flex items-center gap-1 bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-full font-semibold">
+                    {{ leads_media|length }} media
+                </span>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+        <span class="text-xs bg-slate-100 text-slate-500 font-semibold px-2.5 py-1 rounded-full">{{ leads|length }} leads</span>
+    </div>
+    {% endif %}
+
+    <!-- Filtros -->
+    {% if stats %}
+    {% set fp = filtros %}
+    <div class="flex flex-wrap items-center gap-2 mb-4">
+        <!-- Buscador -->
+        <form method="GET" action="/" class="relative flex-1" style="min-width:180px;max-width:280px">
+            {% if fp.email %}<input type="hidden" name="email" value="1">{% endif %}
+            {% if fp.nif %}<input type="hidden" name="nif" value="1">{% endif %}
+            {% if fp.subv %}<input type="hidden" name="subv" value="1">{% endif %}
+            {% if fp.alta %}<input type="hidden" name="alta" value="1">{% endif %}
+            <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-300 text-xs pointer-events-none"></i>
+            <input name="q" type="text" value="{{ fp.q }}" placeholder="Buscar empresa..."
+                class="w-full pl-8 pr-3 py-2 text-sm border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-indigo-400 bg-white">
+        </form>
+
+        <a href="{{ toggle_url('email') }}"
+            class="text-xs font-medium px-3 py-2 rounded-lg border transition-all flex items-center gap-1.5
+                {% if fp.email %}border-indigo-400 bg-indigo-50 text-indigo-600{% else %}border-slate-200 bg-white text-slate-500 hover:border-indigo-300 hover:text-indigo-600{% endif %}">
+            <i class="fa-solid fa-envelope text-[10px]"></i> Con email
+        </a>
+        <a href="{{ toggle_url('subv') }}"
+            class="text-xs font-medium px-3 py-2 rounded-lg border transition-all flex items-center gap-1.5
+                {% if fp.subv %}border-amber-400 bg-amber-50 text-amber-600{% else %}border-slate-200 bg-white text-slate-500 hover:border-amber-300 hover:text-amber-600{% endif %}">
+            <i class="fa-solid fa-landmark text-[10px]"></i> Con subvenciones
+        </a>
+        <a href="{{ toggle_url('nif') }}"
+            class="text-xs font-medium px-3 py-2 rounded-lg border transition-all flex items-center gap-1.5
+                {% if fp.nif %}border-indigo-400 bg-indigo-50 text-indigo-600{% else %}border-slate-200 bg-white text-slate-500 hover:border-indigo-300 hover:text-indigo-600{% endif %}">
+            <i class="fa-solid fa-id-card text-[10px]"></i> Con NIF
+        </a>
+        <a href="{{ toggle_url('alta') }}"
+            class="text-xs font-medium px-3 py-2 rounded-lg border transition-all flex items-center gap-1.5
+                {% if fp.alta %}border-green-400 bg-green-50 text-green-600{% else %}border-slate-200 bg-white text-slate-500 hover:border-green-300 hover:text-green-600{% endif %}">
+            <i class="fa-solid fa-star text-[10px]"></i> Alta relevancia
+        </a>
+
+        {% if fp.email or fp.nif or fp.subv or fp.alta or fp.q %}
+        <a href="/" class="text-xs text-slate-400 hover:text-slate-600 ml-1 flex items-center gap-1 transition-colors">
+            <i class="fa-solid fa-xmark text-[10px]"></i> Limpiar
+        </a>
+        {% endif %}
+
+        <span class="text-xs text-slate-400 ml-auto">
+            {% if fp.email or fp.nif or fp.subv or fp.alta or fp.q %}{{ total_filtrado }} resultado{{ 's' if total_filtrado != 1 else '' }}{% endif %}
+        </span>
+    </div>
+    {% endif %}
+
+    <!-- Grid de tarjetas -->
+    <div id="leads-grid">
+        {% for lead in leads %}
+
+        {% set estado = lead[9] %}
+        {% set procesando = (estado in ['PENDIENTE_F2', 'PENDIENTE_F3', 'PENDIENTE_F4']) %}
+        {% set completo = (estado == 'COMPLETADO_F4') %}
+        {% set sin_datos = completo and not lead[5] and not lead[7] and not lead[8] %}
+        {% set subv_count = lead[11] or 0 %}
+        {% set subv_importe = lead[12] %}
+        {% set tiene_subvenciones = subv_count and subv_count > 0 %}
+        {% set facebook_url = lead[14] %}
+        {% set google_maps_url = lead[15] %}
+        {% set google_rating = lead[16] %}
+        {% set google_reviews = lead[17] %}
+        {% set trustpilot_url = lead[18] %}
+        {% set puntuacion = lead[19] %}
+        {% set p_detalle = lead[20] %}
+        {% set estado_contacto = lead[21] or 'sin_contactar' %}
+        {% set notas = lead[22] or '' %}
+
+        <!-- Color del indicador lateral -->
+        {% if procesando %}
+            {% set color_borde = 'border-orange-300' %}
+            {% set color_dot = 'bg-orange-400 dot-pulse' %}
+            {% set color_dot_static = 'bg-orange-400' %}
+        {% elif sin_datos %}
+            {% set color_borde = 'border-red-200' %}
+            {% set color_dot = 'bg-red-400' %}
+            {% set color_dot_static = 'bg-red-400' %}
+        {% else %}
+            {% set color_borde = 'border-green-200' %}
+            {% set color_dot = 'bg-green-400' %}
+            {% set color_dot_static = 'bg-green-400' %}
+        {% endif %}
+
+        <div class="bg-white rounded-xl border {{ color_borde }} shadow-sm hover:shadow-md transition-shadow flex flex-col row-enter lead-card"
+             data-nombre="{{ lead[1] | lower }}"
+             data-email="{{ '1' if lead[5] else '0' }}"
+             data-nif="{{ '1' if lead[7] else '0' }}"
+             data-subvenciones="{{ '1' if tiene_subvenciones else '0' }}"
+             data-puntuacion="{{ puntuacion or 0 }}"
+             data-contacto="{{ estado_contacto }}"
+             id="card-{{ lead[0] }}">
+
+            <!-- Franja superior de color -->
+            <div class="h-1 rounded-t-xl {% if procesando %}bg-orange-400{% elif sin_datos %}bg-red-400{% else %}bg-green-400{% endif %}"></div>
+
+            <div class="p-5 flex flex-col flex-1">
+
+                <!-- Nombre + estado icono -->
+                <div class="flex justify-between items-start gap-2 mb-4">
+                    <div class="flex-1 min-w-0">
+                        <h4 class="font-bold text-sm text-slate-900 leading-snug line-clamp-2" title="{{ lead[1] }}">{{ lead[1] }}</h4>
+                        {% if puntuacion is not none and completo %}
+                        <div class="flex items-center gap-1 mt-1.5">
+                            {% for i in range(10) %}
+                                <div class="h-1.5 rounded-full w-4
+                                    {% if i < puntuacion %}
+                                        {% if puntuacion >= 8 %}bg-green-400
+                                        {% elif puntuacion >= 5 %}bg-amber-400
+                                        {% else %}bg-red-400{% endif %}
+                                    {% else %}bg-slate-100{% endif %}">
+                                </div>
+                            {% endfor %}
+                            <span class="text-[10px] font-bold ml-1
+                                {% if puntuacion >= 8 %}text-green-600
+                                {% elif puntuacion >= 5 %}text-amber-600
+                                {% else %}text-red-500{% endif %}">
+                                {{ puntuacion }}/10
+                            </span>
+                        </div>
+                        {% endif %}
+                    </div>
+                    <div class="flex-shrink-0 mt-0.5">
+                        {% if procesando %}
+                            <span class="spinner"></span>
+                        {% elif sin_datos %}
+                            <i class="fa-solid fa-circle-xmark text-red-400 text-sm"></i>
+                        {% else %}
+                            <i class="fa-solid fa-circle-check text-green-400 text-sm"></i>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Web -->
+                {% if lead[4] %}
+                <a href="{{ lead[4] }}" target="_blank"
+                   class="flex items-center gap-1.5 text-xs text-indigo-500 hover:text-indigo-700 font-mono truncate mb-4 bg-slate-50 rounded-lg px-2.5 py-1.5 border border-slate-100 hover:border-indigo-200 transition-colors">
+                    <i class="fa-solid fa-arrow-up-right-from-square text-[10px] flex-shrink-0"></i>
+                    <span class="truncate">{{ lead[4] | replace('https://','') | replace('http://','') | replace('www.','') }}</span>
+                </a>
+                {% endif %}
+
+                <!-- Datos -->
+                <div class="space-y-2.5 flex-1">
+
+                    <!-- Email -->
+                    <div class="flex items-center gap-2.5">
+                        <i class="fa-solid fa-envelope w-3.5 text-center text-slate-300 text-xs flex-shrink-0"></i>
+                        <div class="min-w-0 flex-1">
+                            {% if lead[5] %}
+                                <p class="text-xs text-slate-700 truncate">{{ lead[5] }}</p>
+                            {% elif procesando %}
+                                <p class="flex items-center gap-1.5 text-xs text-orange-400">
+                                    <span class="spinner"></span> Buscando...
+                                </p>
+                            {% else %}
+                                <p class="text-xs text-slate-300 italic">No encontrado</p>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- NIF -->
+                    {% set nifs_lista = lead[7].split(',') | map('trim') | list if lead[7] else [] %}
+                    <div class="flex items-start gap-2.5">
+                        <i class="fa-solid fa-id-card w-3.5 text-center text-slate-300 text-xs flex-shrink-0 mt-0.5"></i>
+                        <div class="min-w-0 flex flex-wrap gap-1">
+                            {% if nifs_lista %}
+                                {% for nif_item in nifs_lista %}
+                                <span class="text-xs font-mono font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-100">{{ nif_item }}</span>
+                                {% endfor %}
+                            {% elif procesando %}
+                                <p class="flex items-center gap-1.5 text-xs text-orange-400">
+                                    <span class="spinner"></span> Buscando NIF...
+                                </p>
+                            {% else %}
+                                <p class="text-xs text-slate-300 italic">No detectado</p>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- Gerente -->
+                    <div class="flex items-center gap-2.5">
+                        <i class="fa-solid fa-user-tie w-3.5 text-center text-slate-300 text-xs flex-shrink-0"></i>
+                        <div class="min-w-0 flex-1">
+                            {% if lead[8] %}
+                                <p class="text-xs font-medium text-slate-700 truncate">{{ lead[8] }}</p>
+                                <p class="text-[9px] text-slate-300">Reg. Mercantil</p>
+                            {% elif procesando %}
+                                <p class="flex items-center gap-1.5 text-xs text-orange-400">
+                                    <span class="spinner"></span> Buscando...
+                                </p>
+                            {% else %}
+                                <p class="text-xs text-slate-300 italic">No encontrado</p>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- Teléfono -->
+                    {% if lead[3] %}
+                    <div class="flex items-center gap-2.5">
+                        <i class="fa-solid fa-phone w-3.5 text-center text-slate-300 text-xs flex-shrink-0"></i>
+                        <p class="text-xs font-mono text-slate-600">{{ lead[3] }}</p>
+                    </div>
+                    {% endif %}
+
+                    <!-- Dirección -->
+                    {% if lead[2] %}
+                    <div class="flex items-start gap-2.5">
+                        <i class="fa-solid fa-location-dot w-3.5 text-center text-slate-300 text-xs mt-0.5 flex-shrink-0"></i>
+                        <p class="text-xs text-slate-400 line-clamp-2 leading-snug" title="{{ lead[2] }}">{{ lead[2] }}</p>
+                    </div>
+                    {% endif %}
+
+                </div>
+
+                <!-- Subvenciones -->
+                {% if nifs_lista | length > 1 %}
+                    <!-- Multi-NIF: selector -->
+                    <div class="mt-3 space-y-1.5">
+                        <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Subvenciones por NIF</p>
+                        {% for nif_item in nifs_lista %}
+                        <button type="button"
+                            onclick="consultarSubvNif(this, '{{ lead[1] | e }}', '{{ nif_item }}')"
+                            class="w-full bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg px-3 py-2 flex items-center justify-between gap-2 transition-colors cursor-pointer">
+                            <div class="flex items-center gap-1.5">
+                                <i class="fa-solid fa-landmark text-amber-500 text-xs flex-shrink-0"></i>
+                                <span class="text-xs font-mono font-semibold text-amber-700">{{ nif_item }}</span>
+                            </div>
+                            <div class="flex items-center gap-1.5">
+                                <span class="nif-subv-badge-{{ nif_item | replace(' ','') }} text-[10px] text-amber-500 italic">Ver subvenciones</span>
+                                <i class="fa-solid fa-chevron-right text-amber-400 text-[10px]"></i>
+                            </div>
+                        </button>
+                        {% endfor %}
+                    </div>
+                {% elif tiene_subvenciones %}
+                <button type="button"
+                    onclick="abrirModal(this)"
+                    data-nombre="{{ lead[1] | e }}"
+                    data-resumen="{{ lead[13] | e if lead[13] else '[]' }}"
+                    class="mt-3 w-full bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg px-3 py-2 flex items-center justify-between gap-2 transition-colors cursor-pointer">
+                    <div class="flex items-center gap-1.5">
+                        <i class="fa-solid fa-landmark text-amber-500 text-xs flex-shrink-0"></i>
+                        <span class="text-xs font-semibold text-amber-700">{{ subv_count }} subvención{{ 'es' if subv_count > 1 else '' }}</span>
+                    </div>
+                    <div class="flex items-center gap-1.5">
+                        {% if subv_importe and subv_importe > 0 %}
+                        <span class="text-xs font-bold text-amber-600">{{ "{:,.0f}".format(subv_importe).replace(",", ".") }} €</span>
+                        {% endif %}
+                        <i class="fa-solid fa-chevron-right text-amber-400 text-[10px]"></i>
+                    </div>
+                </button>
+                {% elif completo and lead[7] %}
+                <div class="mt-3 bg-slate-50 border border-slate-100 rounded-lg px-3 py-2 flex items-center gap-1.5">
+                    <i class="fa-solid fa-landmark text-slate-300 text-xs flex-shrink-0"></i>
+                    <span class="text-xs text-slate-300 italic">Sin subvenciones registradas</span>
+                </div>
+                {% elif procesando and lead[7] %}
+                <div class="mt-3 bg-slate-50 border border-slate-100 rounded-lg px-3 py-2 flex items-center gap-1.5">
+                    <span class="spinner"></span>
+                    <span class="text-xs text-orange-400">Consultando BDNS...</span>
+                </div>
+                {% endif %}
+
+                <!-- Google rating -->
+                {% if google_rating %}
+                <div class="mt-3 flex items-center gap-1">
+                    {% for i in range(5) %}
+                        {% if i < google_rating|int %}
+                            <i class="fa-solid fa-star text-amber-400 text-[10px]"></i>
+                        {% elif (google_rating - i) >= 0.5 %}
+                            <i class="fa-solid fa-star-half-stroke text-amber-400 text-[10px]"></i>
+                        {% else %}
+                            <i class="fa-regular fa-star text-slate-200 text-[10px]"></i>
+                        {% endif %}
+                    {% endfor %}
+                    <span class="text-xs font-semibold text-slate-600 ml-1">{{ "%.1f"|format(google_rating) }}</span>
+                    {% if google_reviews %}
+                    <span class="text-[10px] text-slate-400">({{ google_reviews }})</span>
+                    {% endif %}
+                </div>
+                {% endif %}
+
+                <!-- Estado de contacto -->
+                <div class="mt-3 border border-slate-100 rounded-xl overflow-hidden">
+                    <!-- Selector de estado -->
+                    <div class="flex" id="estados-{{ lead[0] }}">
+                        {% set estados = [
+                            ('sin_contactar', '·', 'Sin contactar', 'text-slate-400 hover:bg-slate-50'),
+                            ('contactado',    '✉', 'Contactado',    'text-blue-500 hover:bg-blue-50'),
+                            ('interesado',    '★', 'Interesado',    'text-green-500 hover:bg-green-50'),
+                            ('descartado',    '✕', 'Descartado',    'text-red-400 hover:bg-red-50'),
+                            ('cliente',       '✓', 'Cliente',       'text-purple-500 hover:bg-purple-50'),
+                        ] %}
+                        {% for val, icono, label, color in estados %}
+                        <button
+                            onclick="setEstadoContacto({{ lead[0] }}, '{{ val }}')"
+                            title="{{ label }}"
+                            class="flex-1 py-1.5 text-xs font-semibold transition-colors {{ color }}
+                                {% if estado_contacto == val %}
+                                    {% if val == 'sin_contactar' %}bg-slate-100
+                                    {% elif val == 'contactado' %}bg-blue-100
+                                    {% elif val == 'interesado' %}bg-green-100
+                                    {% elif val == 'descartado' %}bg-red-100
+                                    {% elif val == 'cliente' %}bg-purple-100{% endif %}
+                                {% endif %}"
+                            id="btn-{{ lead[0] }}-{{ val }}">
+                            {{ icono }}
+                        </button>
+                        {% endfor %}
+                    </div>
+                    <!-- Notas -->
+                    <textarea
+                        id="notas-{{ lead[0] }}"
+                        onblur="guardarNotas({{ lead[0] }})"
+                        placeholder="Notas sobre este lead..."
+                        rows="1"
+                        class="w-full px-3 py-2 text-xs text-slate-500 placeholder-slate-300 border-t border-slate-100 outline-none resize-none focus:bg-slate-50 transition-colors"
+                        >{{ notas }}</textarea>
+                </div>
+
+                <!-- Footer tarjeta -->
+                <div class="mt-4 pt-3.5 border-t border-slate-100 flex justify-between items-center">
+                    <a href="/eliminar/{{ lead[0] }}" onclick="return confirm('¿Eliminar este lead?');"
+                       class="text-slate-300 hover:text-red-400 transition-colors" title="Eliminar">
+                        <i class="fa-solid fa-trash-can text-xs"></i>
+                    </a>
+
+                    <div class="flex items-center gap-1.5">
+                        {% if google_maps_url %}
+                        <a href="{{ google_maps_url }}" target="_blank" title="Google Maps"
+                           class="w-7 h-7 flex items-center justify-center rounded-lg bg-slate-50 hover:bg-red-50 text-slate-400 hover:text-red-500 border border-slate-100 transition-colors">
+                            <i class="fa-solid fa-map-location-dot text-xs"></i>
+                        </a>
+                        {% endif %}
+                        {% if facebook_url %}
+                        <a href="{{ facebook_url }}" target="_blank" title="Facebook"
+                           class="w-7 h-7 flex items-center justify-center rounded-lg bg-slate-50 hover:bg-blue-50 text-slate-400 hover:text-blue-600 border border-slate-100 transition-colors">
+                            <i class="fa-brands fa-facebook text-xs"></i>
+                        </a>
+                        {% endif %}
+                        {% if trustpilot_url %}
+                        <a href="{{ trustpilot_url }}" target="_blank" title="Trustpilot"
+                           class="w-7 h-7 flex items-center justify-center rounded-lg bg-slate-50 hover:bg-green-50 text-slate-400 hover:text-green-600 border border-slate-100 transition-colors">
+                            <i class="fa-solid fa-star text-xs"></i>
+                        </a>
+                        {% endif %}
+                        {% if lead[6] %}
+                        <a href="{{ lead[6] }}" target="_blank" title="LinkedIn"
+                           class="w-7 h-7 flex items-center justify-center rounded-lg bg-slate-50 hover:bg-blue-50 text-slate-400 hover:text-blue-700 border border-slate-100 transition-colors">
+                            <i class="fa-brands fa-linkedin text-xs"></i>
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        {% else %}
+        <div class="col-span-1 md:col-span-2 lg:col-span-3 bg-white rounded-xl border border-dashed border-slate-200 p-16 text-center">
+            <i class="fa-solid fa-seedling text-4xl text-slate-200 mb-3 block"></i>
+            <p class="text-slate-400 text-sm">La base de datos está vacía.</p>
+            <p class="text-slate-300 text-xs mt-1">Introduce un sector y ciudad arriba para empezar.</p>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Paginación -->
+    {% if total_pages > 1 %}
+    <div class="flex items-center justify-center gap-1.5 mt-8 flex-wrap">
+        {% if page > 1 %}
+        <a href="{{ page_url(page - 1) }}"
+           class="px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 bg-white text-slate-500 hover:border-indigo-300 hover:text-indigo-600 transition-all flex items-center gap-1">
+            <i class="fa-solid fa-chevron-left text-[10px]"></i> Anterior
+        </a>
+        {% endif %}
+
+        {% for p in range(1, total_pages + 1) %}
+            {% if p == 1 or p == total_pages or (p >= page - 2 and p <= page + 2) %}
+                <a href="{{ page_url(p) }}"
+                   class="w-8 h-8 flex items-center justify-center text-xs font-medium rounded-lg border transition-all
+                       {% if p == page %}border-indigo-400 bg-indigo-50 text-indigo-600{% else %}border-slate-200 bg-white text-slate-500 hover:border-indigo-300 hover:text-indigo-600{% endif %}">
+                    {{ p }}
+                </a>
+            {% elif p == page - 3 or p == page + 3 %}
+                <span class="text-slate-300 text-xs px-1">…</span>
+            {% endif %}
+        {% endfor %}
+
+        {% if page < total_pages %}
+        <a href="{{ page_url(page + 1) }}"
+           class="px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 bg-white text-slate-500 hover:border-indigo-300 hover:text-indigo-600 transition-all flex items-center gap-1">
+            Siguiente <i class="fa-solid fa-chevron-right text-[10px]"></i>
+        </a>
+        {% endif %}
+
+        <span class="text-xs text-slate-400 ml-2">Pág. {{ page }} / {{ total_pages }}</span>
+    </div>
+    {% endif %}
+
+</div>
+
+<script>
+    let ultimoHash = null;
+
+    async function comprobarEstado() {
+        try {
+            const res = await fetch('/estado');
+            const data = await res.json();
+
+            const hashActual = `${data.pendientes_f2}-${data.pendientes_f3}-${data.completados}`;
+
+            // Actualizar badges del header
+            const bar = document.getElementById('estado-bar');
+            const badgeProcesando = document.getElementById('badge-procesando');
+            const badgeOk = document.getElementById('badge-ok');
+            const txtProcesando = document.getElementById('txt-procesando');
+            const txtOk = document.getElementById('txt-ok');
+
+            if (bar) {
+                const procesando = data.pendientes_f2 + data.pendientes_f3;
+                bar.classList.toggle('hidden', false);
+                bar.classList.add('flex');
+
+                if (procesando > 0) {
+                    badgeProcesando.classList.remove('hidden');
+                    badgeProcesando.classList.add('flex');
+                    txtProcesando.textContent = `${procesando} procesando`;
+                } else {
+                    badgeProcesando.classList.add('hidden');
+                }
+
+                if (data.completados > 0) {
+                    badgeOk.classList.remove('hidden');
+                    badgeOk.classList.add('flex');
+                    txtOk.textContent = `${data.completados} completados`;
+                }
+            }
+
+            if (ultimoHash !== null && hashActual !== ultimoHash) {
+                location.reload();
+            }
+            ultimoHash = hashActual;
+
+            if (data.hay_cambios || data.hilo_activo) {
+                setTimeout(comprobarEstado, 4000);
+            }
+
+        } catch (e) {
+            setTimeout(comprobarEstado, 8000);
+        }
+    }
+
+    const hayProcesando = document.body.innerHTML.includes('Procesando');
+    if (hayProcesando) {
+        comprobarEstado();
+    }
+</script>
+
+<!-- Script estado de contacto -->
+<script>
+    const CONFIG_ESTADOS = {
+        sin_contactar: { bg: 'bg-slate-100',  text: 'text-slate-400'  },
+        contactado:    { bg: 'bg-blue-100',   text: 'text-blue-500'   },
+        interesado:    { bg: 'bg-green-100',  text: 'text-green-500'  },
+        descartado:    { bg: 'bg-red-100',    text: 'text-red-400'    },
+        cliente:       { bg: 'bg-purple-100', text: 'text-purple-500' },
+    };
+    const TODOS_ESTADOS = Object.keys(CONFIG_ESTADOS);
+
+    async function setEstadoContacto(id, estado) {
+        const notas = document.getElementById(`notas-${id}`)?.value || '';
+        await fetch(`/lead/${id}/contacto`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ estado_contacto: estado, notas })
+        });
+
+        // Actualizar visual de botones
+        TODOS_ESTADOS.forEach(e => {
+            const btn = document.getElementById(`btn-${id}-${e}`);
+            if (!btn) return;
+            btn.classList.remove(...Object.values(CONFIG_ESTADOS).flatMap(c => [c.bg]));
+            if (e === estado) btn.classList.add(CONFIG_ESTADOS[e].bg);
+        });
+
+        // Actualizar data attribute para filtros
+        const card = document.getElementById(`card-${id}`);
+        if (card) card.dataset.contacto = estado;
+    }
+
+    async function guardarNotas(id) {
+        const notas = document.getElementById(`notas-${id}`)?.value || '';
+        const card  = document.getElementById(`card-${id}`);
+        const estado = card?.dataset.contacto || 'sin_contactar';
+        await fetch(`/lead/${id}/contacto`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ estado_contacto: estado, notas })
+        });
+    }
+</script>
+
+
+<!-- Modal subvenciones -->
+<div id="modal-subv" class="fixed inset-0 z-50 hidden items-center justify-center p-4" style="background:rgba(0,0,0,0.45)">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[85vh] flex flex-col">
+
+        <!-- Header modal -->
+        <div class="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+            <div>
+                <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-0.5">Subvenciones BDNS</p>
+                <h3 id="modal-titulo" class="font-bold text-slate-800 text-base leading-snug"></h3>
+            </div>
+            <button onclick="cerrarModal()" class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+
+        <!-- Resumen totales -->
+        <div id="modal-totales" class="px-6 py-3 bg-amber-50 border-b border-amber-100 flex items-center gap-4 text-sm"></div>
+
+        <!-- Lista concesiones -->
+        <div id="modal-lista" class="overflow-y-auto flex-1 px-6 py-4 space-y-3"></div>
+
+    </div>
+</div>
+
+<script>
+    async function consultarSubvNif(btn, nombre, nif) {
+        const badge = btn.querySelector(`[class*="nif-subv-badge"]`);
+        if (badge) {
+            badge.innerHTML = '<span style="display:inline-block;width:10px;height:10px;border:2px solid rgba(217,119,6,0.3);border-top-color:#d97706;border-radius:50%;animation:spin 0.75s linear infinite;vertical-align:middle"></span>';
+        }
+        try {
+            const res = await fetch(`/api/subvenciones/${encodeURIComponent(nif)}`);
+            const data = await res.json();
+            if (data.error) { alert(`❌ ${data.error}`); return; }
+            if (badge) {
+                badge.textContent = data.count > 0
+                    ? `${data.count} subv. · ${data.importe.toLocaleString('es-ES', {maximumFractionDigits:0})} €`
+                    : 'Sin subvenciones';
+            }
+            // Abrir modal con los datos obtenidos
+            const modalBtn = { dataset: { nombre, resumen: JSON.stringify(data.concesiones) } };
+            abrirModal(modalBtn);
+        } catch(e) {
+            if (badge) badge.textContent = 'Error';
+        }
+    }
+
+    function abrirModal(btn) {
+        const nombre = btn.dataset.nombre;
+        const datos = JSON.parse(btn.dataset.resumen || '[]');
+
+        document.getElementById('modal-titulo').textContent = nombre;
+
+        // Totales
+        const totalImporte = datos.reduce((s, c) => s + (c.importe || 0), 0);
+        document.getElementById('modal-totales').innerHTML = `
+            <div class="flex items-center gap-1.5 text-amber-700">
+                <i class="fa-solid fa-landmark text-amber-500 text-xs"></i>
+                <span class="font-semibold">${datos.length} concesión${datos.length !== 1 ? 'es' : ''}</span>
+            </div>
+            <div class="flex items-center gap-1.5 text-amber-700">
+                <i class="fa-solid fa-euro-sign text-amber-500 text-xs"></i>
+                <span class="font-bold">${totalImporte.toLocaleString('es-ES', {maximumFractionDigits:0})} €</span>
+                <span class="text-amber-500 font-normal text-xs">total recibido</span>
+            </div>
+        `;
+
+        // Lista
+        const lista = document.getElementById('modal-lista');
+        if (datos.length === 0) {
+            lista.innerHTML = '<p class="text-slate-400 text-sm italic text-center py-8">Sin detalle disponible</p>';
+        } else {
+            lista.innerHTML = datos.map(c => `
+                <div class="border border-slate-100 rounded-xl p-4 hover:border-amber-200 hover:bg-amber-50/40 transition-colors">
+                    <div class="flex items-start justify-between gap-3 mb-2">
+                        <p class="text-sm font-medium text-slate-800 leading-snug flex-1">${c.descripcion || 'Sin descripción'}</p>
+                        ${c.importe > 0 ? `<span class="text-sm font-bold text-amber-600 whitespace-nowrap flex-shrink-0">${c.importe.toLocaleString('es-ES', {maximumFractionDigits:0})} €</span>` : ''}
+                    </div>
+                    <div class="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-400">
+                        ${c.fecha ? `<span><i class="fa-regular fa-calendar mr-1"></i>${c.fecha}</span>` : ''}
+                        ${c.organismo ? `<span><i class="fa-solid fa-building-columns mr-1"></i>${c.organismo}</span>` : ''}
+                        ${c.instrumento ? `<span><i class="fa-solid fa-tag mr-1"></i>${c.instrumento}</span>` : ''}
+                        ${c.codigo ? `<span class="font-mono text-slate-300">${c.codigo}</span>` : ''}
+                    </div>
+                    ${c.url_boe ? `<a href="${c.url_boe}" target="_blank" class="inline-flex items-center gap-1 mt-2 text-[10px] text-indigo-400 hover:text-indigo-600 hover:underline"><i class="fa-solid fa-arrow-up-right-from-square"></i> Ver en BOE</a>` : ''}
+                </div>
+            `).join('');
+        }
+
+        const modal = document.getElementById('modal-subv');
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+    }
+
+    function cerrarModal() {
+        const modal = document.getElementById('modal-subv');
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+    }
+
+    document.getElementById('modal-subv').addEventListener('click', function(e) {
+        if (e.target === this) cerrarModal();
+    });
+
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') cerrarModal();
+    });
+</script>
+
+<!-- Modal enviar email -->
+<div id="modal-email" class="fixed inset-0 z-50 hidden items-center justify-center p-4" style="background:rgba(0,0,0,0.45)">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md flex flex-col">
+        <div class="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+            <div>
+                <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-0.5">Enviar leads</p>
+                <h3 class="font-bold text-slate-800 text-base">Por email</h3>
+            </div>
+            <button onclick="cerrarModalEmail()" class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-100 text-slate-400 transition-colors">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+
+        <div class="px-6 py-5 space-y-4">
+            <div>
+                <label class="block text-xs font-medium text-slate-500 mb-1.5">Destinatario</label>
+                <input id="email-destino" type="email" placeholder="correo@ejemplo.com"
+                    class="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition bg-slate-50 focus:bg-white">
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-slate-500 mb-1.5">¿Qué leads enviar?</label>
+                <div class="flex gap-2">
+                    <label class="flex-1 flex items-center gap-2 border border-slate-200 rounded-lg px-3 py-2.5 cursor-pointer hover:border-indigo-300 transition-colors has-[:checked]:border-indigo-400 has-[:checked]:bg-indigo-50">
+                        <input type="radio" name="email-scope" value="todos" checked class="accent-indigo-600">
+                        <span class="text-sm text-slate-600">Todos los leads</span>
+                    </label>
+                    <label class="flex-1 flex items-center gap-2 border border-slate-200 rounded-lg px-3 py-2.5 cursor-pointer hover:border-indigo-300 transition-colors has-[:checked]:border-indigo-400 has-[:checked]:bg-indigo-50">
+                        <input type="radio" name="email-scope" value="filtrados" class="accent-indigo-600">
+                        <span class="text-sm text-slate-600">Filtro activo</span>
+                    </label>
+                </div>
+            </div>
+            <p class="text-xs text-slate-400">Se enviará una tabla HTML + archivo CSV adjunto. Requiere <code class="bg-slate-100 px-1 rounded">EMAIL_USER</code> y <code class="bg-slate-100 px-1 rounded">EMAIL_PASSWORD</code> en el <code class="bg-slate-100 px-1 rounded">.env</code>.</p>
+        </div>
+
+        <div class="px-6 pb-5 flex gap-2">
+            <button onclick="cerrarModalEmail()" class="flex-1 py-2.5 text-sm border border-slate-200 rounded-lg text-slate-500 hover:bg-slate-50 transition-colors">Cancelar</button>
+            <button onclick="enviarEmail()" id="btn-enviar-email"
+                class="flex-1 py-2.5 text-sm bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg transition-colors flex items-center justify-center gap-2">
+                <i class="fa-solid fa-paper-plane text-xs"></i> Enviar
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Guardamos los filtros activos para poder pasarlos al enviar
+    const FILTROS_ACTIVOS = {{ filtros | tojson if filtros else '{}' }};
+
+    function abrirModalEmail() {
+        const modal = document.getElementById('modal-email');
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        document.getElementById('email-destino').focus();
+    }
+
+    function cerrarModalEmail() {
+        const modal = document.getElementById('modal-email');
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+    }
+
+    async function enviarEmail() {
+        const email = document.getElementById('email-destino').value.trim();
+        if (!email) { alert('Introduce un email de destino.'); return; }
+
+        const scope = document.querySelector('input[name="email-scope"]:checked').value;
+        const btn = document.getElementById('btn-enviar-email');
+        btn.disabled = true;
+        btn.innerHTML = '<span style="display:inline-block;width:12px;height:12px;border:2px solid rgba(255,255,255,0.3);border-top-color:white;border-radius:50%;animation:spin 0.75s linear infinite"></span> Enviando...';
+
+        try {
+            const res = await fetch('/enviar-email', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, scope, filtros: FILTROS_ACTIVOS })
+            });
+            const data = await res.json();
+
+            if (data.ok) {
+                cerrarModalEmail();
+                alert(`✅ Email enviado a ${email} con ${data.enviados} leads.`);
+            } else {
+                alert(`❌ ${data.error}`);
+            }
+        } catch (e) {
+            alert('❌ Error de conexión.');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-paper-plane text-xs"></i> Enviar';
+        }
+    }
+
+    document.getElementById('modal-email').addEventListener('click', function(e) {
+        if (e.target === this) cerrarModalEmail();
+    });
+
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') cerrarModalEmail();
+    });
+</script>
+
+</body>
+</html>
