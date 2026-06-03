@@ -1,6 +1,5 @@
 import os
 import re
-import time
 import sqlite3
 import httpx as requests
 from urllib.parse import quote as _quote
@@ -38,7 +37,7 @@ def consultar_libreborme(nif, nombre_empresa):
         if nif and len(nif.strip()) == 9:
             nif_limpio = re.sub(r'[^A-Z0-9]', '', nif.upper())
             url = f"https://libreborme.net/borme/api/v1/empresa/{nif_limpio}/"
-            res = requests.get(url, headers=HEADERS, timeout=6)
+            res = requests.get(url, headers=HEADERS, timeout=6, follow_redirects=True)
             if res.status_code == 200:
                 cargos = res.json().get('cargos_actuales', [])
                 if cargos:
@@ -49,13 +48,13 @@ def consultar_libreborme(nif, nombre_empresa):
             if len(nombre) < 3:
                 return None
             url = f"https://libreborme.net/borme/api/v1/empresa/search/?q={_quote(nombre)}"
-            res = requests.get(url, headers=HEADERS, timeout=6)
+            res = requests.get(url, headers=HEADERS, timeout=6, follow_redirects=True)
             if res.status_code == 200:
                 resultados = res.json().get('objects', [])
                 if resultados:
                     url_empresa = resultados[0].get('resource_uri')
                     if url_empresa:
-                        res2 = requests.get(f"https://libreborme.net{url_empresa}", headers=HEADERS, timeout=6)
+                        res2 = requests.get(f"https://libreborme.net{url_empresa}", headers=HEADERS, timeout=6, follow_redirects=True)
                         if res2.status_code == 200:
                             cargos = res2.json().get('cargos_actuales', [])
                             if cargos:

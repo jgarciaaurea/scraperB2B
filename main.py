@@ -1,21 +1,28 @@
 import os
+import sys
 import csv
 import io
-import json
 import smtplib
 import threading
+
+# Fuerza UTF-8 en stdout/stderr para que los emojis de los print() no rompan en Windows
+if sys.stdout.encoding != 'utf-8':
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+if sys.stderr.encoding != 'utf-8':
+    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
 from email import encoders
 from email.mime.base import MIMEBase
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
-from fastapi import FastAPI, Request, Form, BackgroundTasks
+from fastapi import FastAPI, Request, Form
 from fastapi.responses import HTMLResponse, RedirectResponse, Response, JSONResponse
 from fastapi.templating import Jinja2Templates
-import aiosqlite
+from fastapi.middleware.cors import CORSMiddleware
 
 from fase1_prospeccion import inicializar_base_de_datos, buscar_empresas_solo_google, guardar_leads_basicos
-from fase2_enriquecimiento import enriquecer_pendientes, buscar_nif_infoempresa, buscar_nif_duckduckgo
+from contextlib import asynccontextmanager
+from fase2_enriquecimiento import enriquecer_pendientes, buscar_nif_duckduckgo
 from fase3_borme import ejecutar_fase3_borme
 from fase4_subvenciones import ejecutar_fase4_subvenciones
 from fase5_cualificacion import ejecutar_fase5_cualificacion
@@ -23,7 +30,19 @@ from fase5_cualificacion import ejecutar_fase5_cualificacion
 basedir = os.path.abspath(os.path.dirname(__file__))
 DB_FILE = os.path.join(basedir, "leads.db")
 
-app = FastAPI()
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    inicializar_base_de_datos()
+    arrancar_worker_si_hay_pendientes()
+    yield
+
+app = FastAPI(lifespan=lifespan)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 templates = Jinja2Templates(directory="templates")
 
 _hilo_activo = False
@@ -51,14 +70,6 @@ def _build_where(f_email, f_nif, f_subv, f_alta, q):
         params.append(f"%{q}%")
     where = ("WHERE " + " AND ".join(clauses)) if clauses else ""
     return where, params
-
-
-def _sync_db(fn):
-    import sqlite3
-    conn = sqlite3.connect(DB_FILE)
-    result = fn(conn)
-    conn.close()
-    return result
 
 
 def obtener_leads_paginados(page, f_email, f_nif, f_subv, f_alta, q):
@@ -194,9 +205,31 @@ def worker_enriquecimiento():
                 break
         ejecutar_fase5_cualificacion()
     except Exception as e:
-        print(f"Error en worker: {e}")
+        print(f"Error en worker: {e}", flush=True)
     finally:
         _hilo_activo = False
+
+
+def arrancar_worker_si_hay_pendientes():
+    """Al arrancar el servidor, relanza el worker si quedaron leads a medias."""
+    import sqlite3
+    global _hilo_activo
+    if _hilo_activo:
+        return
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT COUNT(*) FROM b2b_leads
+            WHERE estado_proceso IN ('PENDIENTE_F2','PENDIENTE_F3','PENDIENTE_F4')
+        """)
+        pendientes = cur.fetchone()[0]
+        conn.close()
+        if pendientes > 0:
+            print(f"[Startup] {pendientes} leads pendientes — relanzando worker...", flush=True)
+            threading.Thread(target=worker_enriquecimiento, daemon=True).start()
+    except Exception as e:
+        print(f"[Startup] Error comprobando pendientes: {e}", flush=True)
 
 
 def worker_reintentar_nif():
@@ -221,7 +254,7 @@ def worker_reintentar_nif():
             parsed = urlparse(sitio_web)
             dominio = parsed.netloc.replace('www.', '') or None
 
-        nif = buscar_nif_infoempresa(nombre, dominio) or buscar_nif_duckduckgo(nombre, dominio)
+        nif = buscar_nif_duckduckgo(nombre, dominio)
         if nif:
             try:
                 conn = sqlite3.connect(DB_FILE)
@@ -268,14 +301,41 @@ async def index(request: Request, page: int = 1, email: int = 0, nif: int = 0,
         parts.append(f"page={p}")
         return '/?' + '&'.join(parts)
 
-    return templates.TemplateResponse("index.html", {
-        "request": request,
+    return templates.TemplateResponse(request, "index.html", {
         "leads": leads, "mensaje": mensaje, "stats": stats,
         "page": page, "total_pages": total_pages, "total_filtrado": total_filtrado,
         "filtros": filtros, "per_page": PER_PAGE,
         "toggle_url": toggle_url, "page_url": page_url,
         "historial": obtener_historial(), "sin_nif": contar_sin_nif(),
     })
+
+
+@app.get("/api/leads")
+async def api_leads(page: int = 1, email: int = 0, nif: int = 0,
+                    subv: int = 0, alta: int = 0, q: str = ""):
+    inicializar_base_de_datos()
+    page = max(1, page)
+    leads, total_filtrado = obtener_leads_paginados(page, email, nif, subv, alta, q)
+    stats = calcular_estadisticas_db()
+    total_pages = max(1, (total_filtrado + PER_PAGE - 1) // PER_PAGE)
+    historial = obtener_historial()
+    sin_nif = contar_sin_nif()
+
+    COLS_NAMES = ['id','nombre_empresa','direccion','telefono','sitio_web','email',
+                  'linkedin_empresa','nif','administrador','estado_proceso','actualizado_en',
+                  'subvenciones_count','subvenciones_importe','subvenciones_resumen',
+                  'facebook_url','google_maps_url','google_rating','google_reviews_count',
+                  'trustpilot_url','puntuacion','puntuacion_detalle','estado_contacto','notas']
+
+    return {
+        'leads': [dict(zip(COLS_NAMES, l)) for l in leads],
+        'stats': stats,
+        'total_filtrado': total_filtrado,
+        'total_pages': total_pages,
+        'page': page,
+        'historial': historial,
+        'sin_nif': sin_nif,
+    }
 
 
 @app.post("/buscar")
@@ -287,7 +347,7 @@ async def buscar(sector: str = Form(...), ubicacion: str = Form(...)):
     if not _hilo_activo:
         threading.Thread(target=worker_enriquecimiento, daemon=True).start()
     mensaje = f"Se han volcado {guardados} empresas al panel. Los emails, NIFs y directivos aparecerán de forma progresiva."
-    return RedirectResponse(url=f"/?mensaje={mensaje}", status_code=303)
+    return {'mensaje': mensaje, 'guardados': guardados}
 
 
 @app.get("/buscar-rapido")
@@ -301,7 +361,7 @@ async def buscar_rapido(sector: str = "", ubicacion: str = ""):
     if not _hilo_activo:
         threading.Thread(target=worker_enriquecimiento, daemon=True).start()
     mensaje = f"Se han volcado {guardados} empresas al panel ({sector} · {ubicacion})."
-    return RedirectResponse(url=f"/?mensaje={mensaje}", status_code=303)
+    return {'mensaje': mensaje, 'guardados': guardados}
 
 
 @app.get("/estado")

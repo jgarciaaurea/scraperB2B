@@ -4,7 +4,6 @@ fastapi
 uvicorn[standard]
 beautifulsoup4
 lxml
-aiosqlite
 playwright
 jinja2
 python-multipart

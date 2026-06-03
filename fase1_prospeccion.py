@@ -1,7 +1,5 @@
 import os
-import time
 import sqlite3
-import requests
 import httpx
 from urllib.parse import urlparse
 from dotenv import load_dotenv
@@ -164,80 +162,3 @@ def guardar_leads_basicos(leads):
         print(f"❌ Error al guardar leads básicos: {e}")
         return 0
 
-# =====================================================================
-# 🔄 MÉTODOS TRADICIONALES SÍNCRONOS (MANTENIDOS POR COMPATIBILIDAD)
-# =====================================================================
-
-def guardar_leads_hiper_automatico(leads):
-    """Guarda los leads completamente enriquecidos en un solo bloque."""
-    try:
-        conn = sqlite3.connect(DB_FILE)
-        cursor = conn.cursor()
-        query = """
-        INSERT OR IGNORE INTO b2b_leads 
-        (nombre_empresa, direccion, sitio_web, telefono, email, linkedin_empresa, nif, estado_proceso)
-        VALUES (?, ?, ?, ?, ?, ?, ?, 'PENDIENTE_F3')
-        """
-        nuevos = 0
-        for l in leads:
-            cursor.execute(query, (
-                l['nombre'], l['direccion'], l['web'], 
-                l['telefono'], l['email'], l['linkedin'], l['nif']
-            ))
-            if cursor.rowcount > 0: nuevos += 1
-        conn.commit()
-        conn.close()
-        return nuevos
-    except sqlite3.Error as e:
-        print(f"❌ Error al guardar en SQLite: {e}")
-        return 0
-
-def buscar_y_enriquecer_automatico(sector, ubicacion, max_resultados=20):
-    """Busca y enriquece de forma síncrona (bloqueante)."""
-    url = "https://places.googleapis.com/v1/places:searchText"
-    headers = {
-        "Content-Type": "application/json",
-        "X-Goog-Api-Key": API_KEY,
-        "X-Goog-FieldMask": "places.displayName,places.formattedAddress,places.websiteUri,places.nationalPhoneNumber,places.rating,places.userRatingCount,places.googleMapsUri"
-    }
-    payload = {"textQuery": f"{sector} en {ubicacion}", "languageCode": "es"}
-    
-    leads_enriquecidos = []
-    print(f"🚀 Iniciando búsqueda inteligente para: {sector} en {ubicacion}...")
-    
-    try:
-        response = requests.post(url, json=payload, headers=headers)
-        if response.status_code != 200: return []
-        
-        places = response.json().get("places", [])
-        for place in places:
-            web_sucia = place.get("websiteUri")
-            if web_sucia:
-                web = limpiar_url(web_sucia)
-                nombre = place.get("displayName", {}).get("text", "N/A")
-                
-                print(f"🔎 Extrayendo datos de: {nombre} ({web})...")
-                resultado_scraping = extraer_datos_de_url(web)
-                
-                if resultado_scraping and len(resultado_scraping) == 3:
-                    email, linkedin, nif = resultado_scraping
-                elif resultado_scraping and len(resultado_scraping) == 2:
-                    email, linkedin = resultado_scraping
-                    nif = None
-                else:
-                    email, linkedin, nif = None, None, None
-                
-                leads_enriquecidos.append({
-                    "nombre": nombre,
-                    "direccion": place.get("formattedAddress", "N/A"),
-                    "web": web,
-                    "telefono": place.get("nationalPhoneNumber", "N/A"),
-                    "email": email,
-                    "linkedin": linkedin,
-                    "nif": nif
-                })
-                time.sleep(0.5)
-    except Exception as e:
-        print(f"❌ Error durante el proceso: {e}")
-        
-    return leads_enriquecidos

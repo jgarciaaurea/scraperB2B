@@ -72,60 +72,6 @@ def extraer_nifs_de_texto(texto_bruto):
     return nifs
 
 
-def buscar_nif_infoempresa(nombre_empresa, dominio=None):
-    """
-    Busca el NIF en InfoEmpresa.com — muy fiable para empresas españolas.
-    Intenta primero por dominio web, luego por nombre.
-    """
-    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
-
-    intentos = []
-
-    # Intento 1: buscar por dominio web (muy preciso)
-    if dominio:
-        dominio_limpio = dominio.replace('www.', '').strip('/')
-        intentos.append(f"https://www.infoempresa.com/es-es/es/buscar-empresas?q={_quote(dominio_limpio)}")
-
-    # Intento 2: buscar por nombre
-    if nombre_empresa:
-        intentos.append(f"https://www.infoempresa.com/es-es/es/buscar-empresas?q={_quote(nombre_empresa)}")
-
-    for url_busqueda in intentos:
-        try:
-            res = requests.get(url_busqueda, headers=headers, timeout=8)
-            if res.status_code != 200:
-                continue
-
-            soup = BeautifulSoup(res.text, 'html.parser')
-
-            # El primer resultado de la lista
-            primer_resultado = soup.select_one('a[href*="/empresa/"]')
-            if not primer_resultado:
-                continue
-
-            url_empresa = primer_resultado.get('href', '')
-            if not url_empresa.startswith('http'):
-                url_empresa = 'https://www.infoempresa.com' + url_empresa
-
-            res2 = requests.get(url_empresa, headers=headers, timeout=8)
-            if res2.status_code != 200:
-                continue
-
-            soup2 = BeautifulSoup(res2.text, 'html.parser')
-            texto = soup2.get_text(separator=' ')
-
-            nifs = extraer_nifs_de_texto(texto)
-            if nifs:
-                print(f"✅ [F2] NIF encontrado en InfoEmpresa: {list(nifs)[0]}")
-                return list(nifs)[0]
-
-        except Exception as e:
-            print(f"⚠️ [F2] InfoEmpresa error: {e}")
-            continue
-
-    return None
-
-
 def buscar_nif_duckduckgo(nombre_empresa, dominio=None):
     """
     Busca el NIF en DuckDuckGo como último recurso.
@@ -152,15 +98,12 @@ def buscar_nif_duckduckgo(nombre_empresa, dominio=None):
 
             soup = BeautifulSoup(res.text, 'html.parser')
 
-            # Extraemos texto de títulos + snippets de resultados
             texto_resultados = ' '.join([
                 el.get_text(separator=' ')
                 for el in soup.select('.result__snippet, .result__title, .result__url')
             ])
 
             nifs = extraer_nifs_de_texto(texto_resultados)
-
-            # Filtrar NIFs genéricos o muy cortos que pueden ser falsos positivos
             nifs_validos = {n for n in nifs if len(n) == 9}
             if nifs_validos:
                 nif = sorted(nifs_validos)[0]
@@ -291,11 +234,32 @@ def extraer_datos_de_url(url, _nombre_empresa=None):
 
     emails, nifs, linkedin, facebook, trustpilot, soup, texto = _parsear_html(html_principal)
 
-    # Fallback 1: InfoEmpresa por dominio
+    # Fallback 1: subpáginas legales (aviso legal, privacidad, etc.)
     if not nifs:
-        nif_externo = buscar_nif_infoempresa(None, dominio)
-        if nif_externo:
-            nifs.add(nif_externo)
+        rutas_legales = ['/aviso-legal', '/aviso_legal', '/legal', '/politica-de-privacidad',
+                         '/privacidad', '/terminos', '/quienes-somos', '/sobre-nosotros']
+        # Recoger también los links de la página principal que apunten a páginas legales
+        for a in soup.find_all('a', href=True):
+            href = a['href'].lower()
+            if any(x in href for x in ['legal', 'privacidad', 'aviso', 'terminos', 'quienes']):
+                ruta = a['href'] if a['href'].startswith('http') else url.rstrip('/') + '/' + a['href'].lstrip('/')
+                if ruta not in rutas_legales:
+                    rutas_legales.insert(0, ruta)
+        for ruta in rutas_legales[:6]:
+            try:
+                url_legal = ruta if ruta.startswith('http') else url.rstrip('/') + ruta
+                res_legal = httpx.get(url_legal, headers=headers, timeout=10, follow_redirects=True, verify=False)
+                if res_legal.status_code == 200:
+                    html_legal = res_legal.text
+                    soup_legal = BeautifulSoup(html_legal, 'html.parser')
+                    if _es_pagina_js(html_legal, soup_legal.get_text(separator=' ')):
+                        html_legal = _scrape_con_playwright(url_legal) or html_legal
+                    _, nifs_legal, _, _, _, _, _ = _parsear_html(html_legal) if html_legal else (set(), set(), None, None, None, None, None)
+                    if isinstance(nifs_legal, set) and nifs_legal:
+                        nifs.update(nifs_legal)
+                        break
+            except Exception:
+                continue
 
     # Fallback 2: DuckDuckGo con nombre + dominio
     if not nifs and _nombre_empresa:

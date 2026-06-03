@@ -4,3 +4,5 @@ __pycache__/
 leads.db
 *.db
 .claude/
+frontend/node_modules/
+frontend/.next/

@@ -10,7 +10,7 @@ DB_FILE = os.path.join(basedir, "leads.db")
 
 BDNS_URL = "https://www.infosubvenciones.es/bdnstrans/api/concesiones/busqueda"
 HEADERS = {
-    "User-Agent": "LeadGen B2B Tool / Consulta BDNS pública",
+    "User-Agent": "LeadGen B2B Tool / Consulta BDNS publica",
     "Accept": "application/json",
 }
 
